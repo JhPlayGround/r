@@ -79,7 +79,7 @@ rmse(predB, data[-train,10])
 
 plot(data[-train,10]~predB)
 
-##########RSNNS##########
+##########분류모형 RSNNS ##########
 install.packages("mlbench")
 install.packages("RSNNS")
 library(mlbench)
@@ -128,3 +128,82 @@ round(error_rate,3)
 
 
 ##########AMORE package##########
+detach("package:RSNNS", unload=TRUE)
+library(AMORE)
+
+net = newff(n.neurons = c(6, 12, 8, 1), # 6: 입력변수, 1: 출력노드
+            learning.rate.global = 0.01,
+            momentum.global = 0.5,
+            error.criterium = "LMLS", # min log squared error (robust)
+            Stao = NA,
+            hidden.layer = "sigmoid", 
+            output.layer = "purelin",
+            method = "ADAPTgdwm") # adaptive gradient descent with momentum
+
+X = temp[train, 1:6]
+Y = temp[train, 7]
+
+fit = train(net, P = X, T = Y, error.criterium = "LMLS",report = TRUE, show.step = 100, n.shows = 5)
+
+pred = sign(sim(fit$net, temp[-train,]))
+
+table(pred, sign(temp[-train,7]), dnn=c("Predicted", "Observed"))
+
+error_rate = (1-sum(pred == sign(temp[-train,7]))/124)
+round(error_rate,3)
+
+
+########## 다중 반응변수의 모형화##########
+install.packages("TH.data")
+data("bodyfat", package="TH.data")
+library(neuralnet)
+library(Metrics)
+
+set.seed(2019)
+train = sample(1:71, 50, FALSE)
+
+#model
+scale_bodyfat = as.data.frame(scale(log(bodyfat)))
+f = waistcirc + hipcirc ~ DEXfat + age + elbowbreadth +
+  kneebreadth + anthro3a + anthro3b + anthro3c + anthro4
+
+fit = neuralnet(f, data = scale_bodyfat[train, ], hidden = c(8,4), threshold = 0.1, 
+                err.fct = "sse", algorithm = "rprop+", act.fct = "logistic", linear.output = FALSE)
+
+without_fat = scale_bodyfat
+without_fat$waistcirc = NULL
+without_fat$hipcirc = NULL
+
+pred = compute(fit, without_fat[-train,])
+pred$net.result
+
+fw = waistcirc ~ DEXfat + age + elbowbreadth + kneebreadth + anthro3a + anthro3b + anthro3c + anthro4
+fh = hipcirc ~ DEXfat + age + elbowbreadth + kneebreadth + anthro3a + anthro3b + anthro3c + anthro4
+
+regw = linReg = lm(fw, data=scale_bodyfat[train,])
+regh = linReg = lm(fh, data=scale_bodyfat[train,])
+
+predw = predict(regw, without_fat[-train,])
+predh = predict(regh, without_fat[-train,])
+
+#비교
+mse(scale_bodyfat[-train, 10], pred$net.result[,1])
+mse(scale_bodyfat[-train, 10], predw)
+mse(scale_bodyfat[-train, 10], pred$net.result[,2])
+mse(scale_bodyfat[-train, 10], predh)
+
+set.seed(2019)
+X = as.matrix(without_fat[train,])
+Y = as.matrix(scale_bodyfat[train, 3:4])
+
+fitC = nn.train(x = X, y = Y, initW = NULL, initB = NULL,
+                hidden = c(8,4), activationfun = "sigm", learningrate = 0.02,
+                momentum = 0.74, learningrate_scale = 1, output = "linear",
+                numepochs = 970, batchsize = 60, hidden_dropout = 0, visible_dropout = 0)
+
+Xtest = as.matrix(without_fat[-train,])
+predB = nn.predict(fitC, Xtest)
+
+mse(scale_bodyfat[-train, 10], predB[,1])
+
+mse(scale_bodyfat[-train, 10], predB[,2])
