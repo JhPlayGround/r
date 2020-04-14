@@ -24,7 +24,7 @@ mystats = function(x, na.omit= F){
   quantile = quantile(x)
   # 플러그인 가능한 함수 목록
   # mean, sd, var, min, max, median, length, range, quantile, fivenum
-  return (c(n=n, max = max, min = min, mean=mean, var = var, stdev=s, range = range, skew=skew, kurtosis = kurt, quantil = quantile))
+  return(c(n=n, mean = mean, stdev=s, skew= skew, kurtosis = kurt)) 
 }
 
 sapply(data, mystats)
@@ -51,3 +51,22 @@ stat.desc(data, basic=T, desc=T, norm=T, p=0.95)
 install.packages("psych")
 library(psych)
 psych::describe(data)
+
+
+#집단별 기술 통계랑 확인 
+aggregate(data, by=list(am=mtcars$am), mean)
+aggregate(data, by=list(am=mtcars$am), sd)
+
+dstats = function(x)sapply(x,mystats)
+by(data, mtcars$am, dstats)
+
+
+#doBy 패키지 사용
+install.packages("doBy")
+library(doBy)
+
+summaryBy(mpg+hp+wt ~ am, data= mtcars, Fun = mystats)
+
+
+#psych 패키지 사용
+describeBy(data, list(am=mtcars$am))
